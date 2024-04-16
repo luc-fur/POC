@@ -23,11 +23,10 @@ if azure_openai_endpoint and azure_openai_key:
 else:
     client = openai.OpenAI(api_key=openai_api_key)
 assistant_id = os.environ.get("ASSISTANT_ID")
-instructions = os.environ.get("RUN_INSTRUCTIONS", "")
-assistant_title = os.environ.get("ASSISTANT_TITLE", "Assistants API UI")
-enabled_file_upload_message = os.environ.get(
-    "ENABLED_FILE_UPLOAD_MESSAGE", "Upload a file"
-)
+instructions = "You are a Customer support eginner of a software company. You answer clients' questions besed on technical documentation and customers' solution parameters"
+#os.environ.get("RUN_INSTRUCTIONS", "")
+assistant_title = os.environ.get("ASSISTANT_TITLE", "AI Support Center")
+enabled_file_upload_message = False #os.environ.get("ENABLED_FILE_UPLOAD_MESSAGE", "Upload a file")
 
 
 def create_thread(content, file):
