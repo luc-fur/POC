@@ -6,7 +6,7 @@ import json
 
 import streamlit as st
 import openai
-#from openai.types.beta.threads import MessageContentImageFile
+from openai.types.beta.threads import MessageContentImageFile
 from tools import TOOL_MAP
 
 
@@ -71,7 +71,7 @@ def get_message_value_list(messages):
     for message in messages:
         message_content = ""
         print(message)
-        if not isinstance(message):
+        if not isinstance(message, MessageContentImageFile):
             message_content = message.content[0].text
             annotations = message_content.annotations
         else:
