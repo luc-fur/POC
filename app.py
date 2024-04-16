@@ -6,7 +6,7 @@ import json
 
 import streamlit as st
 import openai
-from openai.types.beta.threads import MessageContentImageFile
+#from openai.types.beta.threads import MessageContentImageFile
 from tools import TOOL_MAP
 
 
@@ -53,7 +53,7 @@ def create_message(thread, content, file):
 
 def create_run(thread):
     run = client.beta.threads.runs.create(
-        thread_id=thread.id, assistant_id=assistant_id, instructions=instructions
+        thread_id=thread.id, assistant_id=assistant_id, instructions=instructions, temperature=0.2
     )
     return run
 
@@ -71,7 +71,7 @@ def get_message_value_list(messages):
     for message in messages:
         message_content = ""
         print(message)
-        if not isinstance(message, MessageContentImageFile):
+        if not isinstance(message):
             message_content = message.content[0].text
             annotations = message_content.annotations
         else:
