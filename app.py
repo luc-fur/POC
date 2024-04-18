@@ -5,7 +5,7 @@ import re
 import json
 
 import streamlit as st
-import openai  
+import openai
 #from openai.types.beta.threads import MessageContentImageFile
 from tools import TOOL_MAP
 
@@ -23,9 +23,10 @@ if azure_openai_endpoint and azure_openai_key:
 else:
     client = openai.OpenAI(api_key=openai_api_key)
 assistant_id = os.environ.get("ASSISTANT_ID")
-instructions = os.environ.get("RUN_INSTRUCTIONS", "")
-assistant_title = os.environ.get("ASSISTANT_TITLE", "Assistants API UI")
-enabled_file_upload_message = os.environ.get("ENABLED_FILE_UPLOAD_MESSAGE", "Upload a file")
+instructions = "You are a Customer support eginner of a software company. You answer clients' questions besed on technical documentation and customers' solution parameters"
+#os.environ.get("RUN_INSTRUCTIONS", "")
+assistant_title = os.environ.get("ASSISTANT_TITLE", "AI Support Center")
+enabled_file_upload_message = False #os.environ.get("ENABLED_FILE_UPLOAD_MESSAGE", "Upload a file")
 
 
 def create_thread(content, file):
@@ -52,7 +53,7 @@ def create_message(thread, content, file):
 
 def create_run(thread):
     run = client.beta.threads.runs.create(
-        thread_id=thread.id, assistant_id=assistant_id, instructions=instructions
+        thread_id=thread.id, assistant_id=assistant_id, instructions=instructions, temperature=0.2
     )
     return run
 
@@ -72,7 +73,6 @@ def get_message_value_list(messages):
         print(message)
         message_content = message.content[0].text
         annotations = message_content.annotations
-        
         citations = []
         for index, annotation in enumerate(annotations):
             message_content.value = message_content.value.replace(
@@ -145,10 +145,11 @@ def get_response(user_input, file):
                     ):
                         input_code = f"### code interpreter\ninput:\n```python\n{tool_call.code_interpreter.input}\n```"
                         print(input_code)
-                        if (
-                            len(st.session_state.tool_calls) == 0
-                            or tool_call.id not in [x.id for x in st.session_state.tool_calls]
-                        ):
+                        if len(
+                            st.session_state.tool_calls
+                        ) == 0 or tool_call.id not in [
+                            x.id for x in st.session_state.tool_calls
+                        ]:
                             st.session_state.tool_calls.append(tool_call)
                             with st.chat_message("Assistant"):
                                 st.markdown(
