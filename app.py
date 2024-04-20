@@ -5,7 +5,7 @@ import re
 import json
 
 import streamlit as st
-import openai
+import openai  
 #from openai.types.beta.threads import MessageContentImageFile
 from tools import TOOL_MAP
 
@@ -36,24 +36,20 @@ def create_thread(content, file):
             "content": content,
         }
     ]
-    if file is not None:
-        messages[0].update({"file_ids": [file.id]})
     thread = client.beta.threads.create(messages=messages)
     return thread
 
 
 def create_message(thread, content, file):
     file_ids = []
-    if file is not None:
-        file_ids.append(file.id)
     client.beta.threads.messages.create(
-        thread_id=thread.id, role="user", content=content, file_ids=file_ids
+        thread_id=thread.id, role="user", content=content
     )
 
 
 def create_run(thread):
     run = client.beta.threads.runs.create(
-        thread_id=thread.id, assistant_id=assistant_id, instructions=instructions, temperature=0.2
+        thread_id=thread.id, assistant_id=assistant_id, instructions=instructions
     )
     return run
 
@@ -73,6 +69,7 @@ def get_message_value_list(messages):
         print(message)
         message_content = message.content[0].text
         annotations = message_content.annotations
+        
         citations = []
         for index, annotation in enumerate(annotations):
             message_content.value = message_content.value.replace(
@@ -145,11 +142,10 @@ def get_response(user_input, file):
                     ):
                         input_code = f"### code interpreter\ninput:\n```python\n{tool_call.code_interpreter.input}\n```"
                         print(input_code)
-                        if len(
-                            st.session_state.tool_calls
-                        ) == 0 or tool_call.id not in [
-                            x.id for x in st.session_state.tool_calls
-                        ]:
+                        if (
+                            len(st.session_state.tool_calls) == 0
+                            or tool_call.id not in [x.id for x in st.session_state.tool_calls]
+                        ):
                             st.session_state.tool_calls.append(tool_call)
                             with st.chat_message("Assistant"):
                                 st.markdown(
