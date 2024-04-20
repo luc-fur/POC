@@ -3,16 +3,17 @@ import time
 import base64
 import re
 import json
-
 import streamlit as st
 import openai  
 #from openai.types.beta.threads import MessageContentImageFile
 from tools import TOOL_MAP
 
-
+# Retrieve environment variables
 azure_openai_endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT")
 azure_openai_key = os.environ.get("AZURE_OPENAI_KEY")
 openai_api_key = os.environ.get("OPENAI_API_KEY")
+
+# Initialize OpenAI client
 client = None
 if azure_openai_endpoint and azure_openai_key:
     client = openai.AzureOpenAI(
@@ -22,13 +23,15 @@ if azure_openai_endpoint and azure_openai_key:
     )
 else:
     client = openai.OpenAI(api_key=openai_api_key)
+
+# Retrieve environment variables
 assistant_id = os.environ.get("ASSISTANT_ID")
 instructions = "You are a Customer support eginner of a software company. You answer clients' questions besed on technical documentation and customers' solution parameters"
 #os.environ.get("RUN_INSTRUCTIONS", "")
 assistant_title = os.environ.get("ASSISTANT_TITLE", "AI Support Center")
 enabled_file_upload_message = False #os.environ.get("ENABLED_FILE_UPLOAD_MESSAGE", "Upload a file")
 
-
+# Function to create a thread
 def create_thread(content, file):
     messages = [
         {
@@ -39,61 +42,37 @@ def create_thread(content, file):
     thread = client.beta.threads.create(messages=messages)
     return thread
 
-
+# Function to create a message
 def create_message(thread, content, file):
     file_ids = []
     client.beta.threads.messages.create(
         thread_id=thread.id, role="user", content=content
     )
 
-
+# Function to create a run
 def create_run(thread):
     run = client.beta.threads.runs.create(
         thread_id=thread.id, assistant_id=assistant_id, instructions=instructions
     )
     return run
 
-
-def create_file_link(file_name, file_id):
-    content = client.files.content(file_id)
-    content_type = content.response.headers["content-type"]
-    b64 = base64.b64encode(content.text.encode(content.encoding)).decode()
-    link_tag = f'<a href="data:{content_type};base64,{b64}" download="{file_name}">Download Link</a>'
-    return link_tag
-
-
+# Function to get message value list
 def get_message_value_list(messages):
     messages_value_list = []
     for message in messages:
         message_content = ""
         print(message)
         message_content = message.content[0].text
-        annotations = message_content.annotations
-        
-        citations = []
-        for index, annotation in enumerate(annotations):
-            message_content.value = message_content.value.replace(
-                annotation.text, f" [{index}]"
-            )
 
-            if file_citation := getattr(annotation, "file_citation", None):
-                cited_file = client.files.retrieve(file_citation.file_id)
-                citations.append(
-                    f"[{index}] {file_citation.quote} from {cited_file.filename}"
-                )
-            elif file_path := getattr(annotation, "file_path", None):
-                link_tag = create_file_link(
-                    annotation.text.split("/")[-1], file_path.file_id
-                )
-                message_content.value = re.sub(
-                    r"\[(.*?)\]\s*\(\s*(.*?)\s*\)", link_tag, message_content.value
-                )
+        #remove annotation as 【25†source】
+        string = "Sample【25†source】"
+        regex_pattern = r"【.*?】"
+        cleaned_message_content= re.sub(regex_pattern, '', message_content.value)
 
-        message_content.value += "\n" + "\n".join(citations)
-        messages_value_list.append(message_content.value)
+        messages_value_list.append(cleaned_message_content)
         return messages_value_list
 
-
+# Function to get message list
 def get_message_list(thread, run):
     completed = False
     while not completed:
@@ -107,11 +86,10 @@ def get_message_list(thread, run):
             break
         else:
             time.sleep(1)
-
     messages = client.beta.threads.messages.list(thread_id=thread.id)
     return get_message_value_list(messages)
 
-
+# Function to get response
 def get_response(user_input, file):
     if "thread" not in st.session_state:
         st.session_state.thread = create_thread(user_input, file)
@@ -121,51 +99,24 @@ def get_response(user_input, file):
     run = client.beta.threads.runs.retrieve(
         thread_id=st.session_state.thread.id, run_id=run.id
     )
-
     while run.status == "in_progress":
         print("run.status:", run.status)
-
         time.sleep(1)
         run = client.beta.threads.runs.retrieve(
-            thread_id=st.session_state.thread.id, run_id=run.id
+            thread_id=st.session_state.thread.id, 
+            run_id=run.id
         )
         run_steps = client.beta.threads.runs.steps.list(
-            thread_id=st.session_state.thread.id, run_id=run.id
+            thread_id=st.session_state.thread.id, 
+            run_id=run.id
         )
         print("run_steps:", run_steps)
-        for step in run_steps.data:
-            if hasattr(step.step_details, "tool_calls"):
-                for tool_call in step.step_details.tool_calls:
-                    if (
-                        hasattr(tool_call, "code_interpreter")
-                        and tool_call.code_interpreter.input != ""
-                    ):
-                        input_code = f"### code interpreter\ninput:\n```python\n{tool_call.code_interpreter.input}\n```"
-                        print(input_code)
-                        if (
-                            len(st.session_state.tool_calls) == 0
-                            or tool_call.id not in [x.id for x in st.session_state.tool_calls]
-                        ):
-                            st.session_state.tool_calls.append(tool_call)
-                            with st.chat_message("Assistant"):
-                                st.markdown(
-                                    input_code,
-                                    True,
-                                )
-                                st.session_state.chat_log.append(
-                                    {
-                                        "name": "assistant",
-                                        "msg": input_code,
-                                    }
-                                )
-
     if run.status == "requires_action":
         print("run.status:", run.status)
         run = execute_action(run, st.session_state.thread)
-
     return "\n".join(get_message_list(st.session_state.thread, run))
 
-
+# Function to execute action
 def execute_action(run, thread):
     tool_outputs = []
     for tool_call in run.required_action.submit_tool_outputs.tool_calls:
@@ -190,12 +141,7 @@ def execute_action(run, thread):
     )
     return run
 
-
-def handle_uploaded_file(uploaded_file):
-    file = client.files.create(file=uploaded_file, purpose="assistants")
-    return file
-
-
+# Function to render chat messages
 def render_chat():
     for chat in st.session_state.chat_log:
         with st.chat_message(chat["name"]):
@@ -215,44 +161,23 @@ if "in_progress" not in st.session_state:
 def disable_form():
     st.session_state.in_progress = True
 
-
+# Main function
 def main():
     st.title(assistant_title)
     user_msg = st.chat_input(
         "Message", on_submit=disable_form, disabled=st.session_state.in_progress
     )
-    if enabled_file_upload_message:
-        uploaded_file = st.sidebar.file_uploader(
-            enabled_file_upload_message,
-            type=[
-                "txt",
-                "pdf",
-                "png",
-                "jpg",
-                "jpeg",
-                "csv",
-                "json",
-                "geojson",
-                "xlsx",
-                "xls",
-            ],
-            disabled=st.session_state.in_progress,
-        )
-    else:
-        uploaded_file = None
+    uploaded_file = None
     if user_msg:
         render_chat()
         with st.chat_message("user"):
             st.markdown(user_msg, True)
         st.session_state.chat_log.append({"name": "user", "msg": user_msg})
         file = None
-        if uploaded_file is not None:
-            file = handle_uploaded_file(uploaded_file)
         with st.spinner("Wait for response..."):
             response = get_response(user_msg, file)
         with st.chat_message("Assistant"):
             st.markdown(response, True)
-
         st.session_state.chat_log.append({"name": "assistant", "msg": response})
         st.session_state.in_progress = False
         st.session_state.tool_call = None
